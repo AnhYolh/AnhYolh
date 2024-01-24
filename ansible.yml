@@ -1,0 +1,64 @@
+- name: Svtech Exam
+  hosts: all
+  remote_user: anhdt
+
+  tasks:
+#    - name: Run Sudo
+#      command: sudo su
+#      vars:
+#        ansible_become_pass: 'Netnam2023@#!@#$'
+
+#    - name: Set hostname
+#      hostname:
+#        name: SvTech
+
+    - name: Account Admin
+      user:
+        name: "{{ item.name }}"
+        groups: sudo
+        password: "{{ item.password | password_hash('sha512')}}"
+      with_items:
+        - { name: 'anhdt1', password: 'Sysadmin@2024' }
+        - { name: 'anhdt2', password: 'Sysadmin@2024' }
+
+    - name: Log user
+      lineinfile:
+        path: /etc/bash.bashrc
+        line: |
+          if [ -n "$SSH_CONNECTION" ]; then
+              /usr/bin/script -a -f -q /var/log/ssh_commands/session_$(date +%Y%m%d_%H%M%S)_$(whoami)_$$
+          fi
+
+    - name: Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Configure Docker
+      lineinfile:
+        path: /etc/docker/daemon.json
+        state: touch
+        mode: '0644'
+        line: |
+          {
+            "log-driver": "json-file",
+            "storage-driver": "overlay2"
+          }
+      notify:
+        - Restart Docker Service
+
+    - name: Network Trafic
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      with_items:
+        - { name: 'net.core.somaxconn', value: 65535 }
+        - { name: 'net.ipv4.ip_forward', value: 1 }
+
+  handlers:
+    - name: Restart Docker Service
+      service:
+        name: docker
+        state: restarted
